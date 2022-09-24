@@ -3,7 +3,7 @@
   "description": "Download a subdirectory of a GitHub repository as a new repository",
   "license": "MIT",
   "author": "Jan Willem Henckel",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "main": "./lib/index.js",
   "type": "module",
   "bin": {
@@ -14,6 +14,15 @@
     "README.md",
     "LICENSE.md"
   ],
+  "homepage": "https://github.com/djfarly/ghcd#readme",
+  "bugs": {
+    "url": "https://github.com/djfarly/ghcd/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/djfarly/ghcd.git"
+  },
+  "license": "MIT",
   "scripts": {
     "audit:npm-check-updates": "npx npm-check-updates --errorLevel 1",
     "build": "tsc -p .",
