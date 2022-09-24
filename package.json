@@ -1,0 +1,53 @@
+{
+  "name": "gh-csf",
+  "description": "Download a subfolder of a GitHub repository as a new repository",
+  "license": "MIT",
+  "author": "Jan Willem Henckel",
+  "version": "0.0.0",
+  "main": "./lib/index.js",
+  "type": "module",
+  "bin": {
+    "gh-csf": "./lib/index.js"
+  },
+  "scripts": {
+    "audit:npm-check-updates": "npx npm-check-updates --errorLevel 1",
+    "build": "tsc -p .",
+    "create": "npm run build && npm run test",
+    "local": "sudo npm uninstall -g && sudo npm install -g && gh-csf",
+    "npm:format": "npx prettier-package-json --write package.json",
+    "npm:upgrade": "npx npm-check-updates -iu",
+    "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node-esm' src/index.ts"
+  },
+  "dependencies": {
+    "axios": "^0.27.2",
+    "chalk": "^5.0.1",
+    "cli-progress": "^3.11.2",
+    "commander": "^9.4.0",
+    "execa": "^6.1.0",
+    "fs-extra": "^10.1.0",
+    "got": "^12.5.0",
+    "p-queue": "^7.3.0",
+    "p-retry": "^5.1.1"
+  },
+  "devDependencies": {
+    "@types/cli-progress": "^3.11.0",
+    "@types/fs-extra": "^9.0.13",
+    "@types/node": "^18.7.19",
+    "@typescript-eslint/parser": "^5.38.0",
+    "depcheck": "^1.4.3",
+    "eslint": "^8.24.0",
+    "eslint-plugin-unicorn": "^43.0.2",
+    "nodemon": "^2.0.20",
+    "ts-node": "^10.9.1",
+    "typescript": "^4.8.3"
+  },
+  "keywords": [
+    "cli",
+    "nodejs",
+    "typescript"
+  ],
+  "eslintConfig": {
+    "extends": "plugin:unicorn/recommended",
+    "parser": "@typescript-eslint/parser"
+  }
+}
