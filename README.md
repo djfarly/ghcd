@@ -1,4 +1,4 @@
-# GitHub Clone Directory CLI
+# 📂 GitHub Clone Directory — `ghcd`
 
 > A CLI to _clone_[^1] a subdirectory of a GitHub repository
 
