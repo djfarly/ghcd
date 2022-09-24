@@ -24,7 +24,6 @@
     "start": "nodemon --watch 'src/**/*.ts' --exec 'ts-node-esm' src/index.ts"
   },
   "dependencies": {
-    "axios": "^0.27.2",
     "chalk": "^5.0.1",
     "cli-progress": "^3.11.2",
     "commander": "^9.4.0",
