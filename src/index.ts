@@ -1,17 +1,17 @@
 #!/usr/bin/env node
 
 import chalk from "chalk";
+import { Presets, SingleBar } from "cli-progress";
 import { program } from "commander";
+import { execa } from "execa";
 import fs from "fs-extra";
 import got from "got";
-import PQueue from "p-queue";
-import path from "node:path";
 import crypto from "node:crypto";
+import path from "node:path";
 import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
-import { SingleBar, Presets } from "cli-progress";
+import PQueue from "p-queue";
 import pRetry from "p-retry";
-import { execa } from "execa";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -20,71 +20,73 @@ const packageJson = fs.readJSONSync(path.join(__dirname, "../package.json"));
 program
   .version(packageJson.version)
   .description(packageJson.description)
-  .argument("<url>", "the repository (subfolder / tree) to download from")
-  .option("-i, --init", "Initialize folder as a new git repository")
+  .argument("<url>", "the repository (subdirectory / tree) to download from")
+  .option("-i, --init", "Initialize directory as a new git repository")
   .parse(process.argv);
 
 const { init } = program.opts<{ init: boolean }>();
 
-let temporaryFolderName: string | undefined;
+let temporaryDirectoryName: string | undefined;
 
 try {
   const parsedGitHubUrl = parseGitHubUrl(program.args[0]);
 
-  temporaryFolderName = await pRetry(createTemporaryFolder, {
+  temporaryDirectoryName = await pRetry(createTemporaryDirectory, {
     retries: 3,
   });
 
-  await downloadFolder(parsedGitHubUrl, temporaryFolderName);
+  await downloadDirectory(parsedGitHubUrl, temporaryDirectoryName);
 
-  const finalFolderName = await renameFolder(
+  const finalDirectoryName = await renameDirectory(
     parsedGitHubUrl,
-    temporaryFolderName
+    temporaryDirectoryName
   );
 
   if (init) {
-    await initializeGit(finalFolderName);
+    await initializeGit(finalDirectoryName);
   }
 
   console.log();
   console.log(chalk.green("✅ Done!"));
   console.log(
-    `👉 Run ${chalk.blue.dim(`cd ${finalFolderName}`)} to enter the folder`
+    `👉 Run ${chalk.blue.dim(
+      `cd ${finalDirectoryName}`
+    )} to enter the directory`
   );
 } catch (error) {
   console.warn(chalk.red("😱 Something went wrong!"));
 
-  if (temporaryFolderName) {
-    await fs.remove(temporaryFolderName);
+  if (temporaryDirectoryName) {
+    await fs.remove(temporaryDirectoryName);
   }
 
   console.error((error as Error)?.message);
   process.exit(1);
 }
 
-async function initializeGit(folderName: string) {
-  await fs.remove(path.join(folderName, ".git"));
+async function initializeGit(directoryName: string) {
+  await fs.remove(path.join(directoryName, ".git"));
 
   await execa("git", ["init", "--initial-branch=main"], {
-    cwd: folderName,
+    cwd: directoryName,
   });
 
   await execa("git", ["add", "--all"], {
-    cwd: folderName,
+    cwd: directoryName,
   });
 
   await execa("git", ["commit", '-m "initial commit"'], {
-    cwd: folderName,
+    cwd: directoryName,
   });
 
   console.log();
   console.log(chalk.green("🚀 Initialized git repository"));
 }
 
-async function createTemporaryFolder() {
-  const folderName = crypto.randomUUID();
-  await fs.mkdir(folderName);
-  return folderName;
+async function createTemporaryDirectory() {
+  const directoryName = crypto.randomUUID();
+  await fs.mkdir(directoryName);
+  return directoryName;
 }
 
 interface GitHubFile {
@@ -105,9 +107,9 @@ interface GitHubFile {
   transferredSize?: number;
 }
 
-async function downloadFolder(
+async function downloadDirectory(
   parsedGitHubUrl: ReturnType<typeof parseGitHubUrl>,
-  folderName: string
+  directoryName: string
 ) {
   console.log(`📥 ${chalk.green("Downloading files...")}`);
 
@@ -117,9 +119,9 @@ async function downloadFolder(
 
   const githubApiUrl = `https://api.github.com/repos/${author}/${repository}/contents/${dir}?ref=${branch}`;
 
-  const filesAndFolders = await got(githubApiUrl).json<GitHubFile[]>();
+  const filesAndDirectorys = await got(githubApiUrl).json<GitHubFile[]>();
 
-  const filesToDownload = filesAndFolders.filter(
+  const filesToDownload = filesAndDirectorys.filter(
     (file) => file.download_url && file.size > 0
   );
 
@@ -150,9 +152,12 @@ async function downloadFolder(
       return async () => {
         const { download_url, path: fullFilePath } = file;
 
-        await fs.mkdirp(folderName);
+        await fs.mkdirp(directoryName);
 
-        const filePath = path.join(folderName, fullFilePath.replace(dir, "."));
+        const filePath = path.join(
+          directoryName,
+          fullFilePath.replace(dir, ".")
+        );
 
         const downloadStream = got.stream.get(download_url);
         const writeStream = fs.createWriteStream(filePath, { flags: "w" });
@@ -171,16 +176,16 @@ async function downloadFolder(
   console.log();
 }
 
-async function renameFolder(
+async function renameDirectory(
   parsedGitHubUrl: ReturnType<typeof parseGitHubUrl>,
-  folderName: string
+  directoryName: string
 ) {
   let bestName =
     parsedGitHubUrl.repository + "-" + parsedGitHubUrl.dir.replace(/\//g, "-");
 
   try {
     const packageJson = await fs.readJSON(
-      path.join(folderName, "package.json")
+      path.join(directoryName, "package.json")
     );
     if (packageJson.name) {
       bestName = packageJson.name;
@@ -190,19 +195,19 @@ async function renameFolder(
   }
 
   let retries = 0;
-  async function renameFolder() {
+  async function renameDirectory() {
     const currentName = `${bestName}${retries ? "-" + retries : ""}`;
 
     if (await fs.pathExists(currentName)) {
-      throw new Error("Folder already exists");
+      throw new Error("Directory already exists");
     }
 
-    await fs.rename(folderName, currentName);
+    await fs.rename(directoryName, currentName);
 
     return currentName;
   }
 
-  const finalFolderName = await pRetry(renameFolder, {
+  const finalDirectoryName = await pRetry(renameDirectory, {
     forever: true,
     minTimeout: 0,
     maxTimeout: 0,
@@ -212,10 +217,10 @@ async function renameFolder(
   });
 
   console.log(
-    `📂 ${chalk.green(`Created folder: ${chalk.bold(finalFolderName)}`)}`
+    `📂 ${chalk.green(`Created directory: ${chalk.bold(finalDirectoryName)}`)}`
   );
 
-  return finalFolderName;
+  return finalDirectoryName;
 }
 
 function parseGitHubUrl(url: string) {

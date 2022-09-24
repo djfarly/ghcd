@@ -1,13 +1,13 @@
 {
-  "name": "gh-csf",
-  "description": "Download a subfolder of a GitHub repository as a new repository",
+  "name": "ghcd",
+  "description": "Download a subdirectory of a GitHub repository as a new repository",
   "license": "MIT",
   "author": "Jan Willem Henckel",
   "version": "0.0.0",
   "main": "./lib/index.js",
   "type": "module",
   "bin": {
-    "gh-csf": "./lib/index.js"
+    "ghcd": "./lib/index.js"
   },
   "scripts": {
     "audit:npm-check-updates": "npx npm-check-updates --errorLevel 1",
