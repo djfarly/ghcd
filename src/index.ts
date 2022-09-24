@@ -111,6 +111,7 @@ async function downloadDirectory(
   parsedGitHubUrl: ReturnType<typeof parseGitHubUrl>,
   directoryName: string
 ) {
+  console.log();
   console.log(`📥 ${chalk.green("Downloading files...")}`);
 
   const queue = new PQueue({ concurrency: 8 });
@@ -241,10 +242,11 @@ function parseGitHubUrl(url: string) {
     throw new Error("Invalid GitHub URL");
   }
 
-  console.log(`
-🔗 ${parsed.author}/${parsed.repository} (${chalk.green(parsed.branch)})
-📂 ${parsed.dir}
-`);
+  console.log();
+  console.log(
+    `🔗 ${parsed.author}/${parsed.repository} (${chalk.green(parsed.branch)})`
+  );
+  console.log(`📂 ${parsed.dir}`);
 
   return parsed;
 }
