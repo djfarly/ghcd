@@ -12,6 +12,7 @@ import { pipeline } from "node:stream/promises";
 import { fileURLToPath } from "node:url";
 import PQueue from "p-queue";
 import pRetry from "p-retry";
+import prettyBytes from "pretty-bytes";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -33,6 +34,8 @@ try {
 
   temporaryDirectoryName = await pRetry(createTemporaryDirectory, {
     retries: 3,
+    minTimeout: 0,
+    maxTimeout: 0,
   });
 
   await downloadDirectory(parsedGitHubUrl, temporaryDirectoryName);
@@ -47,20 +50,19 @@ try {
   }
 
   console.log();
-  console.log(chalk.green("✅ Done!"));
+  console.log(chalk.green("✅ done"));
   console.log(
-    `👉 Run ${chalk.blue.dim(
-      `cd ${finalDirectoryName}`
-    )} to enter the directory`
+    `👉 use ${chalk.blue(`cd ${finalDirectoryName}`)} to enter the directory`
   );
+  console.log();
 } catch (error) {
-  console.warn(chalk.red("😱 Something went wrong!"));
+  console.warn(chalk.red("😱 something went wrong!"));
 
   if (temporaryDirectoryName) {
     await fs.remove(temporaryDirectoryName);
   }
 
-  console.error((error as Error)?.message);
+  console.error((error as Error).message);
   process.exit(1);
 }
 
@@ -80,7 +82,7 @@ async function initializeGit(directoryName: string) {
   });
 
   console.log();
-  console.log(chalk.green("🚀 Initialized git repository"));
+  console.log(chalk.green("🚀 initialized git repository"));
 }
 
 async function createTemporaryDirectory() {
@@ -89,22 +91,21 @@ async function createTemporaryDirectory() {
   return directoryName;
 }
 
-interface GitHubFile {
-  name: string;
+interface TreeEntry {
   path: string;
+  mode: string;
+  type: "tree" | "blob";
   sha: string;
-  size: number;
+  size?: number;
   url: string;
-  html_url: string;
-  git_url: string;
-  download_url: string;
-  type: string;
-  _links: {
-    self: string;
-    git: string;
-    html: string;
-  };
   transferredSize?: number;
+}
+
+function getDownloadUrl(
+  parsedGitHubUrl: ReturnType<typeof parseGitHubUrl>,
+  path: string
+) {
+  return `https://raw.githubusercontent.com/${parsedGitHubUrl.author}/${parsedGitHubUrl.repository}/${parsedGitHubUrl.branch}/${parsedGitHubUrl.dir}/${path}`;
 }
 
 async function downloadDirectory(
@@ -112,27 +113,64 @@ async function downloadDirectory(
   directoryName: string
 ) {
   console.log();
-  console.log(`📥 ${chalk.green("Downloading files...")}`);
-
-  const queue = new PQueue({ concurrency: 8 });
+  console.log(`📥 ${chalk.green("downloading files...")}`);
 
   const { author, repository, branch, dir } = parsedGitHubUrl;
 
-  const githubApiUrl = `https://api.github.com/repos/${author}/${repository}/contents/${dir}?ref=${branch}`;
+  const entry = await got(
+    `https://api.github.com/repos/${author}/${repository}/branches/${branch}`
+  ).json<{ commit: { sha: string } }>();
 
-  const filesAndDirectorys = await got(githubApiUrl).json<GitHubFile[]>();
+  let currentDirectory: TreeEntry = {
+    path: "",
+    mode: "040000",
+    type: "tree",
+    sha: entry.commit.sha,
+    url: `https://api.github.com/repos/${author}/${repository}/git/trees/${entry.commit.sha}`,
+  };
 
-  const filesToDownload = filesAndDirectorys.filter(
-    (file) => file.download_url && file.size > 0
+  const directoryStack = dir.split("/");
+
+  while (directoryStack.length > 0) {
+    const treeResponse = await got(currentDirectory.url).json<{
+      tree: TreeEntry[];
+    }>();
+
+    const directoryToMatch = directoryStack.shift();
+
+    const nextDirectory = treeResponse.tree.find(
+      (entry) => directoryToMatch === entry.path && entry.type === "tree"
+    );
+
+    if (nextDirectory) {
+      currentDirectory = nextDirectory;
+    } else {
+      throw new Error("Could not find directory in tree");
+    }
+  }
+
+  const recursiveTreeResponse = await got(
+    currentDirectory.url + "?recursive=1"
+  ).json<{ tree: TreeEntry[] }>();
+
+  const filesToDownload = recursiveTreeResponse.tree.filter(
+    (entry) => entry.type === "blob"
   );
 
-  const sizeAll = filesToDownload.reduce((sum, file) => sum + file.size, 0);
+  const sizeAll = filesToDownload.reduce(
+    (sum, file) => sum + (file.size ?? 0),
+    0
+  );
 
   const progressBar = new SingleBar(
     {
       format: `{bar}${chalk.dim(" ┈ ")}{percentage}%${chalk.dim(
-        " ┈ {value}/{total} bytes transferred"
+        " ┈ {value} of {total} bytes transferred"
       )}`,
+      formatValue: (value, _, type) =>
+        ["value", "total"].includes(type)
+          ? prettyBytes(value)
+          : value.toString(),
     },
     Presets.shades_classic
   );
@@ -148,19 +186,20 @@ async function downloadDirectory(
     );
   }
 
+  const queue = new PQueue({ concurrency: 8 });
+
   await queue.addAll(
     filesToDownload.map((file, index) => {
       return async () => {
-        const { download_url, path: fullFilePath } = file;
+        const { path: relativeFilePath } = file;
 
-        await fs.mkdirp(directoryName);
+        const downloadUrl = getDownloadUrl(parsedGitHubUrl, relativeFilePath);
 
-        const filePath = path.join(
-          directoryName,
-          fullFilePath.replace(dir, ".")
-        );
+        const filePath = path.join(directoryName, relativeFilePath);
 
-        const downloadStream = got.stream.get(download_url);
+        await fs.ensureDir(path.dirname(filePath));
+
+        const downloadStream = got.stream.get(downloadUrl);
         const writeStream = fs.createWriteStream(filePath, { flags: "w" });
 
         downloadStream.on("downloadProgress", (progress) => {
@@ -217,9 +256,7 @@ async function renameDirectory(
     },
   });
 
-  console.log(
-    `📂 ${chalk.green(`Created directory: ${chalk.bold(finalDirectoryName)}`)}`
-  );
+  console.log(`📂 ${chalk.green(`created ${chalk.bold(finalDirectoryName)}`)}`);
 
   return finalDirectoryName;
 }
