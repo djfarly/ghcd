@@ -165,7 +165,7 @@ async function downloadDirectory(
   const progressBar = new SingleBar(
     {
       format: `{bar}${chalk.dim(" ┈ ")}{percentage}%${chalk.dim(
-        " ┈ {value} of {total} bytes transferred"
+        " ┈ {value} of {total} transferred"
       )}`,
       formatValue: (value, _, type) =>
         ["value", "total"].includes(type)
