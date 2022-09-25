@@ -3,7 +3,7 @@
   "description": "Download a subdirectory of a GitHub repository as a new repository",
   "license": "MIT",
   "author": "Jan Willem Henckel",
-  "version": "0.0.2",
+  "version": "0.1.0",
   "main": "./lib/index.js",
   "type": "module",
   "bin": {
