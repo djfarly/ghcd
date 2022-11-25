@@ -32,9 +32,20 @@ async function getAuthToken() {
   }
 }
 
+let didLogAuth = false;
+
 async function get<T>(endpoint: string): Promise<T> {
   if (!GITHUB_TOKEN) {
     await getAuthToken();
+  }
+
+  if (!didLogAuth) {
+    if (GITHUB_TOKEN) {
+      console.log(chalk.dim("🔑 using GitHub API with token"));
+    } else {
+      console.log(chalk.dim("👥 using GitHub API anonymously"));
+    }
+    didLogAuth = true;
   }
 
   return got(

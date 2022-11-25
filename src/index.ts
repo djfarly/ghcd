@@ -19,6 +19,7 @@ program
   .version(packageJson.version)
   .description(packageJson.description)
   .argument("<url>", "the repository (subdirectory / tree) to download from")
+  .argument("<dir>", "the directory to download to")
   .option("-i, --init", "Initialize directory as a new git repository")
   .parse(process.argv);
 
@@ -28,6 +29,7 @@ let temporaryDirectoryName: string | undefined;
 
 try {
   const location = parseGitHubUrl(program.args[0]);
+  const userPreferredDirectoryName = program.args[1];
 
   console.log();
   console.log(
@@ -47,7 +49,8 @@ try {
 
   const finalDirectoryName = await renameDirectory(
     location,
-    temporaryDirectoryName
+    temporaryDirectoryName,
+    userPreferredDirectoryName
   );
 
   if (init) {
@@ -96,21 +99,57 @@ async function createTemporaryDirectory() {
   return directoryName;
 }
 
-async function renameDirectory(
+async function getBestName(
   location: GitHubLocation,
-  directoryName: string
+  directoryName: string,
+  userPreferredDirectoryName?: string
 ) {
-  let bestName = location.repository + "-" + location.dir.replace(/\//g, "-");
+  if (userPreferredDirectoryName) {
+    return userPreferredDirectoryName;
+  }
 
   try {
     const packageJson = await fs.readJSON(
       path.join(directoryName, "package.json")
     );
     if (packageJson.name) {
-      bestName = packageJson.name;
+      return packageJson.name;
     }
   } catch {
     // this is not a node project so we can't use the package.json name
+  }
+
+  return location.repository + "-" + location.dir.replace(/\//g, "-");
+}
+
+async function renameDirectory(
+  location: GitHubLocation,
+  directoryName: string,
+  userPreferredDirectoryName?: string
+) {
+  const bestName = await getBestName(
+    location,
+    directoryName,
+    userPreferredDirectoryName
+  );
+
+  if (bestName === userPreferredDirectoryName) {
+    // try to update the package.json name
+    try {
+      const packageJson = await fs.readJSON(
+        path.join(directoryName, "package.json")
+      );
+      packageJson.name = bestName;
+      await fs.writeJSON(
+        path.join(directoryName, "package.json"),
+        packageJson,
+        {
+          spaces: 2,
+        }
+      );
+    } catch {
+      // this is not a node project so we can't use the package.json name
+    }
   }
 
   let retries = 0;
