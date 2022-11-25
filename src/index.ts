@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const packageJson = fs.readJSONSync(path.join(__dirname, "../package.json"));
 
 program
+  .name("ghcd")
   .version(packageJson.version)
   .description(packageJson.description)
   .argument("<url>", "the repository (subdirectory / tree) to download from")
