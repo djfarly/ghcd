@@ -20,7 +20,7 @@ program
   .version(packageJson.version)
   .description(packageJson.description)
   .argument("<url>", "the repository (subdirectory / tree) to download from")
-  .argument("<dir>", "the directory to download to")
+  .argument("[dir]", "the directory to download to")
   .option("-i, --init", "Initialize directory as a new git repository")
   .parse(process.argv);
 
