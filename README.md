@@ -3,7 +3,7 @@
 > A CLI to _clone_[^1] a subdirectory of a GitHub repository
 
 ```sh
-npx ghcd@latest [options] <url> <dir>
+npx ghcd@latest [options] <url> [dir]
 ```
 
 ## Usage
